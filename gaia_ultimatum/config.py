@@ -1,169 +1,135 @@
+"""Game configuration.
 
-# Constantes pour l'ensemble du projet
-SCREEN_WIDTH = 1200
-SCREEN_HEIGHT = 800
-BACKGROUND_COLOR = (20, 24, 32)
-TEXT_COLOR = (255, 255, 255)
-BUTTON_COLOR = (60, 66, 77)
-BUTTON_HOVER_COLOR = (75, 83, 96)
-ACCENT_COLOR = (92, 184, 92)
-DISABLED_COLOR = (128, 128, 128)
-PROGRESS_BAR_BG = (70, 77, 90)
-PROGRESS_BAR_FILL = (92, 184, 92)
-NOTIFICATION_BG = (50, 55, 64)
-SLIDER_BG_COLOR = (45, 50, 60)
-SLIDER_ACTIVE_COLOR = (92, 184, 92)
-SLIDER_HANDLE_COLOR = (220, 220, 220)
-INPUT_BG_COLOR = (30, 34, 42)
-PLACEHOLDER_COLOR = (128, 128, 128)
-GRID_COLOR = (40, 44, 52)
-#Couleurs specifique des bouttons
-BUTTON_BORDER_COLOR = (101, 111, 128)
+All tunable values live here. Values are exposed as frozen dataclasses so they
+are safe to share across modules and easy to override from tests.
+"""
 
-# Couleurs spécifiques pour les catastrophes
-CATASTROPHE_COLORS = {
-    "Eau": (64, 164, 223),
-    "Feu": (235, 83, 83),
-    "Air": (188, 231, 253),
-    "Terre": (141, 110, 99),
-    "Vie": (92, 184, 92)
-}
+from __future__ import annotations
 
-WATER_COLOR = (64, 164, 223)
+import json
+import os
+from collections.abc import Mapping
+from dataclasses import asdict, dataclass, field, replace
+from pathlib import Path
+from typing import Any
 
-# Couleurs pour les victoires
-VICTORY_RED = (220, 20, 20)
-DARK_RED = (120, 20, 20)
-VICTORY_COLOR = (64, 209, 124)
-GOLDEN_COLOR = (255, 215, 0)
-
-# Couleurs pour les options
-ACCENT_COLOR_2 = (72, 144, 192)
-
-# Remplissage des sliders
-SLIDER_FILL = (92, 184, 92)
-SLIDER_BG = (45, 50, 60)
+from gaia_ultimatum.assets import DATA_DIR
 
 
-TITLE_FONT = 72
-FONT = 36
-SMALL_FONT = 28
-DESCRIPTION_FONT = 24
-ICON_FONT = 36
+@dataclass(frozen=True)
+class DisplayConfig:
+    width: int = 1200
+    height: int = 800
+    fps: int = 60
+    title: str = "Gaia Ultimatum"
+    fullscreen: bool = False
 
 
+@dataclass(frozen=True)
+class AudioConfig:
+    master_volume: float = 0.8
+    music_volume: float = 0.7
+    effects_volume: float = 0.8
+    muted: bool = False
 
-# Couleurs
-BLANC = (255, 255, 255)
-NOIR = (0, 0, 0)
-VERT = (0, 255, 0)
-BLEU = (173, 216, 230)
-ROUGE = (255, 0, 0)
 
-largeur, hauteur = 1200, 600
+@dataclass(frozen=True)
+class GameplayConfig:
+    victory_threshold: float = 0.90
+    defeat_mortality_ratio: float = 0.80
+    min_zoom: float = 0.2
+    max_zoom: float = 5.0
+    zoom_step: float = 1.1
+    point_spawn_probability: float = 0.05
+    point_lifetime_range: tuple[int, int] = (60, 180)
+    point_size_range: tuple[float, float] = (4.0, 10.0)
 
-NUM_PARTICLES = 200
-DEFAULT_BACKGROUND_PARTICLE_COUNT = 50
-EMITTERS = [(100, 0), (400, 0), (700, 0)]
-ACCENT_COLORS = [(255, 0, 0), (0, 255, 0), (0, 0, 255)]
-SIZE_RANGE = (1, 5)
-SPEED_RANGE = (1, 3)
-ALPHA_RANGE = (100, 200)
 
-# Constantes pour les valeurs par défaut
-DEFAULT_SHAKE_INTENSITY = 0.5
-DEFAULT_PULSE_AMPLITUDE = 4
-DEFAULT_PULSE_FREQ_COEFFICIENT = 0.003
-DEFAULT_GLOW_RADIUS = 15
-DEFAULT_HOVER_SPEED = 0.1
+@dataclass(frozen=True)
+class Palette:
+    background: tuple[int, int, int] = (5, 20, 30)
+    country_outline: tuple[int, int, int] = (100, 100, 100)
+    selected_outline: tuple[int, int, int] = (255, 255, 255)
+    point_red: tuple[int, int, int] = (255, 50, 50)
+    ui_background: tuple[int, int, int, int] = (30, 30, 40, 200)
+    text: tuple[int, int, int] = (255, 255, 255)
+    ui_highlight: tuple[int, int, int] = (70, 120, 200)
+    healthy: tuple[int, int, int] = (50, 100, 255)
+    affected: tuple[int, int, int] = (255, 50, 50)
+    dead: tuple[int, int, int] = (10, 10, 10)
 
-# Constantes par défaut pour les paramètres de couleur
-DEFAULT_HUE_OFFSET = 0.6
-DEFAULT_HUE_SPEED = 0.001
-DEFAULT_SATURATION = 0.6
-DEFAULT_VALUE = 0.8
-HUE_SPEED = 0.001
 
-# Constantes par défaut pour la couleur et l'effet de survol
-DEFAULT_BUTTON_COLOR = (100, 100, 255)  # Couleur par défaut du bouton (par exemple, bleu)
-DEFAULT_BUTTON_HOVER_COLOR = (150, 150, 255)  # Couleur de survol par défaut du bouton
-DEFAULT_HOVER_INTENSITY = 0.2  # Intensité de l'effet de survol
+@dataclass(frozen=True)
+class Config:
+    display: DisplayConfig = field(default_factory=DisplayConfig)
+    audio: AudioConfig = field(default_factory=AudioConfig)
+    gameplay: GameplayConfig = field(default_factory=GameplayConfig)
+    palette: Palette = field(default_factory=Palette)
+    debug: bool = False
 
-# Constantes
-FRAME_RATE = 60
-BUTTON_SPACING = 250
-INITIAL_X_OFFSET = 150
-BUTTON_SIZE = 150
-TITLE_Y_POSITION = 90
-BUTTONS_Y_POSITION = 250
-TITLE_FONT_SIZE = 48
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
 
-ELEMENT_BUTTON_WIDTH = 150
-ELEMENT_BUTTON_HEIGHT = 150
-ELEMENT_BUTTON_SPACING = 100
-ELEMENT_MAX_BUTTONS_PER_LINE = 3
-ELEMENT_BUTTON_START_Y = 120
-ELEMENT_FONT_SIZE = 36
-DEFAULT_ELEMENT_PULSE_FREQ_COEFFICIENT = 0.005
-DEFAULT_ELEMENT_PULSE_AMPLITUDE = 4
 
-DEFAULT_BACK_BUTTON_START_X = 50
-DEFAULT_BACK_BUTTON_START_Y = 550
-DEFAULT_BACK_BUTTON_WIDTH = 200
-DEFAULT_BACK_BUTTON_HEIGHT = 50
+DEFAULT_CONFIG = Config()
+CONFIG_FILE: Path = DATA_DIR / "config.json"
 
-# Constantes par défaut pour la bordure et la couleur dynamique
-DEFAULT_ACCENT_COLOR = (100, 150, 255)  # Exemple de couleur accentuée
-DEFAULT_BORDER_HOVER_COLOR = (255, 215, 100)  # Exemple de couleur dynamique pour la bordure lors du survol
-DEFAULT_BUTTON_BORDER_RADIUS = 15  # Rayon de la bordure du bouton
-DEFAULT_BORDER_THICKNESS = 2  # Épaisseur de la bordure du bouton
-DEFAULT_GLOW_ALPHA = 100  # Alpha par défaut pour la lueur
-DEFAULT_MAX_GLOW_RADIUS = 20  # Rayon maximal de la lueur
-DEFAULT_GLOW_PULSE = 1 # Fréquence de pulsation de la lueur
-DEFAULT_BUTTON_FONT_SIZE = 36
-DEFAULT_SHADOW_COLOR = (0, 0, 0)  # Couleur de l'ombre du texte
-DEFAULT_SHADOW_OFFSET = 2  # Décalage de l'ombre
-DEFAULT_BUTTON_TEXT_COLOR = (255, 255, 255)  # Couleur du texte principal
-DEFAULT_GLOW_ALPHA_STEP = 30  # Diminution de l'alpha de la lueur par couche
-DEFAULT_GLOW_INTENSITY = 100  # Intensité initiale de la lueur
 
-# texte animé
-DEFAULT_FONT_PATH = None
-DEFAULT_FONT_SIZE = 92
-DEFAULT_COLOR = (255, 255, 255)
-DEFAULT_WAVE_HEIGHT = 12
-DEFAULT_WAVE_LENGTH = 0.1
-DEFAULT_WAVE_SPEED = 0.005
-DEFAULT_GLOW_COLOR = (255, 165, 0)
-DEFAULT_GLOW_STEPS = 3
+def _apply_env_overrides(config: Config) -> Config:
+    """Apply GAIA_* environment variables as overrides for common fields."""
+    display = config.display
+    audio = config.audio
+    overrides_display: dict[str, Any] = {}
+    overrides_audio: dict[str, Any] = {}
 
-# Menu principal
-# Gestion FPS
-FPS = 60
-# Menu principal
-MAIN_MENU_BUTTON_WIDTH = 300
-MAIN_MENU_BUTTON_HEIGHT = 60
-MAIN_MENU_BUTTON_SPACING = 80
-MAIN_MENU_START_Y = 250
-# Texte
-TITLE_SUBTITLE_ALPHA_SPEED = 0.005
-TITLE_VERSION_ALPHA_SPEED = 0.01
+    if (value := os.environ.get("GAIA_WIDTH")) is not None:
+        overrides_display["width"] = int(value)
+    if (value := os.environ.get("GAIA_HEIGHT")) is not None:
+        overrides_display["height"] = int(value)
+    if (value := os.environ.get("GAIA_FPS")) is not None:
+        overrides_display["fps"] = int(value)
+    if (value := os.environ.get("GAIA_FULLSCREEN")) is not None:
+        overrides_display["fullscreen"] = value.lower() in ("1", "true", "yes")
+    if (value := os.environ.get("GAIA_MUTED")) is not None:
+        overrides_audio["muted"] = value.lower() in ("1", "true", "yes")
 
-# Format du sous-titre
-DEFAULT_SUBTITLE_FONT_SIZE = 48
-DEFAULT_SUBTITLE_COLOR = (255, 255, 255)
-DEFAULT_SUBTITLE_START_Y = 25
-DEFAULT_SUBTITLE_START_X = 25
-DEFAULT_SUBTITLE_FONT_PATH = None
-DEFAULT_SUBTITLE_WAVE_HEIGHT = 6
-DEFAULT_SUBTITLE_WAVE_LENGTH = 0.1
-DEFAULT_SUBTITLE_WAVE_SPEED = 0.005
-DEFAULT_SUBTITLE_GLOW_COLOR = (255, 165, 0)
-DEFAULT_SUBTITLE_GLOW_INTENSITY = 100
-DEFAULT_SUBTITLE_GLOW_STEPS = 3
+    debug = os.environ.get("GAIA_DEBUG", "").lower() in ("1", "true", "yes") or config.debug
 
-# color
-WHITE = (255, 255, 255)
-GREEN = (0, 255, 0)
-RED = (255, 0, 0)
+    return replace(
+        config,
+        display=replace(display, **overrides_display) if overrides_display else display,
+        audio=replace(audio, **overrides_audio) if overrides_audio else audio,
+        debug=debug,
+    )
 
+
+def load_config(path: Path | None = None) -> Config:
+    """Load configuration, applying JSON file overrides then environment overrides.
+
+    A missing file is not an error — defaults are used. Unknown keys are ignored.
+    """
+    config = DEFAULT_CONFIG
+    config_path = path or CONFIG_FILE
+    if config_path.is_file():
+        try:
+            raw = json.loads(config_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            raw = {}
+        config = _merge(config, raw)
+    return _apply_env_overrides(config)
+
+
+def _merge(config: Config, overrides: Mapping[str, Any]) -> Config:
+    display = overrides.get("display", {}) or {}
+    audio = overrides.get("audio", {}) or {}
+    gameplay = overrides.get("gameplay", {}) or {}
+    return replace(
+        config,
+        display=replace(config.display, **{k: v for k, v in display.items() if hasattr(config.display, k)}),
+        audio=replace(config.audio, **{k: v for k, v in audio.items() if hasattr(config.audio, k)}),
+        gameplay=replace(
+            config.gameplay,
+            **{k: v for k, v in gameplay.items() if hasattr(config.gameplay, k)},
+        ),
+        debug=bool(overrides.get("debug", config.debug)),
+    )
