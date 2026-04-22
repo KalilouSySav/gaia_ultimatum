@@ -1,0 +1,78 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [master, main, "claude/**"]
+  workflow_dispatch:
+
+# Grant the workflow token the permissions needed by actions/deploy-pages.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Only one live deploy at a time; queue the next one if needed.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build web bundle with pygbag
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install ffmpeg
+        # pygbag uses ffmpeg to transcode bundled MP3/WAV assets into OGG.
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ffmpeg
+
+      - name: Install pygbag
+        run: |
+          python -m pip install --upgrade pip
+          pip install "pygbag>=0.9"
+
+      - name: Build the WebAssembly bundle
+        # --build                      : non-interactive, writes to build/web
+        # --archive                    : also produce a .zip for download
+        # --ume_block 0                : skip the "click to start" overlay
+        # --disable-sound-format-error : we ship MP3 assets but run web with --no-audio
+        run: |
+          python -m pygbag \
+            --build \
+            --archive \
+            --ume_block 0 \
+            --disable-sound-format-error \
+            main.py
+
+      - name: Prepare artifact
+        run: |
+          ls -la build/web
+          # GitHub Pages serves index.html at the deployed URL root.
+          test -f build/web/index.html
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/web
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4
