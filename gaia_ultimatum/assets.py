@@ -17,6 +17,7 @@ IMAGES_DIR: Path = DATA_DIR / "images"
 FONTS_DIR: Path = DATA_DIR / "fonts"
 
 ZONES_GEOJSON: Path = DATA_DIR / "zones.geojson"
+ZONES_GEOJSON_LIGHT: Path = DATA_DIR / "zones.geo.json"
 
 
 def asset(relative_path: str | Path) -> Path:

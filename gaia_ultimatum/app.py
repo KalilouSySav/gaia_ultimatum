@@ -1,8 +1,13 @@
-"""Application entry point: wires up model, view, controller and runs the loop."""
+"""Application entry point: wires up model, view, controller and runs the loop.
+
+The loop is ``async`` so that the same code path runs both on the desktop
+(through ``asyncio.run``) and in the browser via `pygbag <https://pygame-web.github.io>`_.
+"""
 
 from __future__ import annotations
 
 import argparse
+import asyncio
 import dataclasses
 import logging
 import sys
@@ -35,6 +40,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 
 def run(argv: list[str] | None = None) -> int:
+    """Synchronous desktop entry point."""
+    return asyncio.run(run_async(argv))
+
+
+async def run_async(argv: list[str] | None = None) -> int:
+    """Async entry point used by both desktop (``asyncio.run``) and pygbag."""
     args = parse_args(argv)
     config = load_config()
     if args.debug:
@@ -43,16 +54,14 @@ def run(argv: list[str] | None = None) -> int:
 
     pygame.init()
     try:
-        return _run_game(config, args)
+        return await _run_game(config, args)
     finally:
         pygame.quit()
 
 
-def _run_game(config: Config, args: argparse.Namespace) -> int:
+async def _run_game(config: Config, args: argparse.Namespace) -> int:
     flags = pygame.FULLSCREEN if config.display.fullscreen else 0
-    screen = pygame.display.set_mode(
-        (config.display.width, config.display.height), flags
-    )
+    screen = pygame.display.set_mode((config.display.width, config.display.height), flags)
     pygame.display.set_caption(config.display.title)
     clock = pygame.time.Clock()
     fonts = Fonts.create()
@@ -82,6 +91,7 @@ def _run_game(config: Config, args: argparse.Namespace) -> int:
                 break
         renderer.draw(screen, game)
         pygame.display.flip()
+        await asyncio.sleep(0)
         clock.tick(config.display.fps)
 
     if game.outcome is GameOutcome.VICTORY:

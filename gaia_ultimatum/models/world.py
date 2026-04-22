@@ -49,8 +49,13 @@ class World:
     def _parse_feature(feature: dict, rng: random.Random) -> Country | None:
         properties = feature.get("properties") or {}
         geometry = feature.get("geometry") or {}
-        country_id = properties.get("ISO_A3") or properties.get("iso_a3")
         name = properties.get("ADMIN") or properties.get("name")
+        country_id = (
+            properties.get("ISO_A3")
+            or properties.get("iso_a3")
+            or properties.get("ADM0_A3")
+            or name
+        )
         if not country_id or not name:
             return None
         population = int(properties.get("pop_est") or 1_000_000)
