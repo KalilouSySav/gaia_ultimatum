@@ -33,3 +33,10 @@ coverage.xml
 data/saves/
 data/config.json
 *.log
+
+# pygbag build artifacts + transcoded copies
+build/
+*-pygbag.ogg
+*-pygbag.py
+*.apk
+*.tar.gz

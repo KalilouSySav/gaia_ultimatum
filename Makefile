@@ -1,4 +1,4 @@
-.PHONY: help install dev test lint format typecheck run clean
+.PHONY: help install dev test lint format typecheck run web-build web-serve clean
 
 PYTHON ?= python3
 
@@ -11,6 +11,8 @@ help:
 	@echo "  lint        Run ruff linter"
 	@echo "  format      Auto-format with ruff"
 	@echo "  typecheck   Run mypy"
+	@echo "  web-build   Build the WebAssembly bundle with pygbag"
+	@echo "  web-serve   Build + serve the web bundle locally on :8000"
 	@echo "  clean       Remove build + cache artifacts"
 
 install:
@@ -34,6 +36,12 @@ format:
 
 typecheck:
 	$(PYTHON) -m mypy gaia_ultimatum
+
+web-build:
+	$(PYTHON) -m pygbag --build --archive --ume_block 0 --disable-sound-format-error main.py
+
+web-serve:
+	$(PYTHON) -m pygbag --ume_block 0 --disable-sound-format-error main.py
 
 clean:
 	rm -rf build dist *.egg-info .pytest_cache .mypy_cache .ruff_cache htmlcov .coverage coverage.xml

@@ -119,6 +119,49 @@ The package follows a Model / View / Controller split:
   into calls on the model.
 - **app.py** — wires them together and owns the frame loop.
 
+## Web build & GitHub Pages
+
+The game ships with a [pygbag](https://pygame-web.github.io)-based WebAssembly
+entry point (`main.py` at the repo root) that runs the game inside any modern
+browser via Pyodide. A GitHub Actions workflow builds and deploys it to
+GitHub Pages on every push to `master`, `main`, or `claude/**`.
+
+### Local web preview
+
+```bash
+pip install -e ".[web]"
+make web-serve          # http://localhost:8000
+# or
+python -m pygbag --ume_block 0 main.py
+```
+
+### Produce a static bundle
+
+```bash
+make web-build          # outputs build/web/
+```
+
+The `build/web/` directory is a self-contained static site you can host
+anywhere (GitHub Pages, Netlify, Cloudflare Pages, S3, nginx, etc.).
+
+### Enabling GitHub Pages
+
+1. Push this repo to GitHub.
+2. Go to **Settings → Pages**.
+3. Under **Build and deployment → Source**, pick **GitHub Actions**.
+4. The next push (or a manual run of the *Deploy to GitHub Pages* workflow
+   from the **Actions** tab) will publish to
+   `https://<user>.github.io/<repo>/`.
+
+### Web-build tradeoffs
+
+- The browser build uses the lighter `zones.geo.json` (~1 MB) instead of the
+  24 MB `zones.geojson`, so the initial load is reasonable.
+- Audio is disabled by default in the web build (`--no-audio`) to avoid
+  browsers that block autoplay.
+- The RNG is seeded (`--seed 42`) so refreshes produce the same game. Edit
+  `main.py` to change or remove the seed.
+
 ## Development
 
 ```bash
