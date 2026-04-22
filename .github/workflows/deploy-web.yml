@@ -42,10 +42,9 @@ jobs:
           pip install "pygbag>=0.9"
 
       - name: Build the WebAssembly bundle
-        # --build                      : non-interactive, writes to build/web
-        # --archive                    : also produce a .zip for download
-        # --ume_block 0                : skip the "click to start" overlay
-        # --disable-sound-format-error : we ship MP3 assets but run web with --no-audio
+        # Keep the default pygame-web CDN so pygbag can fetch `default.tmpl`
+        # during the build. The Firefox OpaqueResponseBlocking fix is applied
+        # post-build by self-hosting the runtime alongside the game (next step).
         run: |
           python -m pygbag \
             --build \
@@ -53,6 +52,59 @@ jobs:
             --ume_block 0 \
             --disable-sound-format-error \
             main.py
+
+      - name: Self-host the pygbag runtime
+        # Firefox's OpaqueResponseBlocking (and strict CSP setups) reject the
+        # cross-origin scripts pygame-web.github.io serves, leaving the canvas
+        # blank. Mirror the runtime into build/web/cdn/ and rewrite the
+        # generated index.html to load everything from the same origin.
+        run: |
+          set -euo pipefail
+          cd build/web
+          CDN_BASE="https://pygame-web.github.io/cdn/0.9.3"
+          mkdir -p cdn/cpython312
+
+          fetch() {
+            local rel="$1"
+            mkdir -p "cdn/$(dirname "$rel")"
+            if curl -fsSL "$CDN_BASE/$rel" -o "cdn/$rel"; then
+              echo "  ok  $rel"
+            else
+              echo "  SKIP $rel"
+            fi
+          }
+
+          # Runtime loaded directly by index.html
+          fetch pythons.js
+
+          # Runtime modules pythons.js fetches at startup
+          for f in \
+            browserfs.min.js \
+            xterm.js xterm.css \
+            xterm-addon-image.js xterm-addon-fit.js xterm-addon-image.wasm \
+            vtx.js vtx.css \
+            snd.js \
+            gui.js gui.css \
+            empty.html \
+            offline.png \
+            favicon.png; do
+            fetch "$f"
+          done
+
+          # CPython 3.12 WebAssembly bundle (the biggest part)
+          for f in \
+            cpython312/main.js \
+            cpython312/main.data \
+            cpython312/main.wasm \
+            cpython312/main.symbols \
+            cpython312/bundle.json; do
+            fetch "$f"
+          done
+
+          # Rewrite the config.cdn that index.html hands to pythons.js
+          sed -i 's|https://pygame-web.github.io/cdn/0.9.3/|cdn/|g' index.html
+
+          ls -lR cdn | head -40
 
       - name: Prepare artifact
         run: |

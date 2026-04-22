@@ -1,9 +1,13 @@
-"""Rendering: the only layer allowed to touch ``pygame.Surface``."""
+"""Rendering: the only layer allowed to touch ``pygame.Surface``.
+
+Uses ``pygame.draw`` exclusively (not ``pygame.gfxdraw``) so the module loads
+on pygame-ce WebAssembly builds (pygbag), which do not ship gfxdraw and whose
+import resolver would otherwise try to fetch it from PyPI.
+"""
 
 from __future__ import annotations
 
 import pygame
-import pygame.gfxdraw
 
 from gaia_ultimatum.config import Config, Palette
 from gaia_ultimatum.models import Country, Game, World
@@ -53,24 +57,19 @@ class Renderer:
                 transformed = [world.transform_point(p, self.screen_size) for p in polygon]
                 if len(transformed) < 3:
                     continue
-                pygame.gfxdraw.filled_polygon(surface, transformed, color)
-                pygame.gfxdraw.polygon(surface, transformed, outline)
+                pygame.draw.polygon(surface, color, transformed)
+                pygame.draw.polygon(surface, outline, transformed, 1)
 
     def _draw_points(self, surface: pygame.Surface, world: World, catastrophe: Catastrophe) -> None:
         for point in catastrophe.active_points:
             pos = world.transform_point(point.position, self.screen_size)
             lifetime_ratio = point.lifetime / point.max_lifetime if point.max_lifetime else 0.0
             size = max(1, int(point.size * (0.8 + lifetime_ratio * 0.2)))
-            alpha = int(255 * lifetime_ratio)
-            red = (*self.palette.point_red, alpha)
-            pygame.gfxdraw.filled_circle(surface, int(pos[0]), int(pos[1]), size, red)
-            pygame.gfxdraw.aacircle(
-                surface,
-                int(pos[0]),
-                int(pos[1]),
-                size,
-                (*self.palette.point_red, min(alpha, 200)),
-            )
+            # pygame.draw.circle has no per-call alpha, so fade via background blend.
+            red = _blend(self.palette.background, self.palette.point_red, lifetime_ratio)
+            cx, cy = int(pos[0]), int(pos[1])
+            pygame.draw.circle(surface, red, (cx, cy), size)
+            pygame.draw.circle(surface, self.palette.point_red, (cx, cy), size, 1)
             value_text = self.fonts.small.render(str(point.value), True, self.palette.text)
             surface.blit(
                 value_text,
@@ -159,6 +158,15 @@ def _country_color(country: Country, palette: Palette) -> tuple[int, int, int]:
     else:
         ratio = (country.state - 0.5) * 2
         start, end = palette.affected, palette.dead
+    return _blend(start, end, ratio)
+
+
+def _blend(
+    start: tuple[int, int, int],
+    end: tuple[int, int, int],
+    ratio: float,
+) -> tuple[int, int, int]:
+    ratio = max(0.0, min(1.0, ratio))
     return (
         int(start[0] + (end[0] - start[0]) * ratio),
         int(start[1] + (end[1] - start[1]) * ratio),
