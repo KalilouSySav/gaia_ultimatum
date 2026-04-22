@@ -56,42 +56,41 @@ jobs:
       - name: Self-host the pygbag runtime
         # Firefox's OpaqueResponseBlocking (and strict CSP setups) reject the
         # cross-origin scripts pygame-web.github.io serves, leaving the canvas
-        # blank. Mirror the runtime into build/web/cdn/ and rewrite the
-        # generated index.html to load everything from the same origin.
+        # blank. Mirror the runtime next to the game so everything loads from
+        # the same origin.
+        #
+        # pythons.js uses relative ES-module imports for the feature modules
+        # (vtx/snd/gui/fs), so the files have to sit at the *same directory*
+        # as index.html — not in a cdn/ subfolder. The cpython bundle lives
+        # under cpython312/ because that's how config.executable resolves it.
         run: |
           set -euo pipefail
           cd build/web
           CDN_BASE="https://pygame-web.github.io/cdn/0.9.3"
-          mkdir -p cdn/cpython312
 
           fetch() {
             local rel="$1"
-            mkdir -p "cdn/$(dirname "$rel")"
-            if curl -fsSL "$CDN_BASE/$rel" -o "cdn/$rel"; then
-              echo "  ok  $rel"
+            mkdir -p "$(dirname "$rel")"
+            if curl -fsSL "$CDN_BASE/$rel" -o "$rel"; then
+              echo "  ok   $rel"
             else
               echo "  SKIP $rel"
             fi
           }
 
-          # Runtime loaded directly by index.html
-          fetch pythons.js
-
-          # Runtime modules pythons.js fetches at startup
+          # Runtime loaded directly by index.html + feature modules imported
+          # relatively by pythons.js (see data-os="vtx,fs,gui,snd" in template).
           for f in \
+            pythons.js \
             browserfs.min.js \
+            vtx.js snd.js gui.js fs.js \
             xterm.js xterm.css \
             xterm-addon-image.js xterm-addon-fit.js xterm-addon-image.wasm \
-            vtx.js vtx.css \
-            snd.js \
-            gui.js gui.css \
-            empty.html \
-            offline.png \
-            favicon.png; do
+            empty.html offline.png; do
             fetch "$f"
           done
 
-          # CPython 3.12 WebAssembly bundle (the biggest part)
+          # CPython 3.12 WebAssembly bundle
           for f in \
             cpython312/main.js \
             cpython312/main.data \
@@ -101,10 +100,14 @@ jobs:
             fetch "$f"
           done
 
-          # Rewrite the config.cdn that index.html hands to pythons.js
-          sed -i 's|https://pygame-web.github.io/cdn/0.9.3/|cdn/|g' index.html
+          # Strip the absolute CDN URL from index.html so config.cdn becomes
+          # empty and every subsequent import resolves relative to this page.
+          sed -i 's|https://pygame-web.github.io/cdn/0.9.3/||g' index.html
 
-          ls -lR cdn | head -40
+          echo "--- build/web layout ---"
+          ls -la
+          echo "--- cpython312 ---"
+          ls -la cpython312 2>/dev/null || true
 
       - name: Prepare artifact
         run: |
