@@ -41,18 +41,19 @@ jobs:
           python -m pip install --upgrade pip
           pip install "pygbag>=0.9"
 
-      - name: Build the WebAssembly bundle
-        # --build                      : non-interactive, writes to build/web
-        # --archive                    : also produce a .zip for download
-        # --ume_block 0                : skip the "click to start" overlay
-        # --disable-sound-format-error : we ship MP3 assets but run web with --no-audio
+            - name: Build the WebAssembly bundle
+        # --cdn jsDelivr : pygame-web.github.io triggers Firefox OpaqueResponseBlocking
+        #                  because it serves JS/WASM without proper CORS/Content-Type
+        #                  headers; jsDelivr proxies the same repo with correct headers.
         run: |
           python -m pygbag \
             --build \
             --archive \
             --ume_block 0 \
             --disable-sound-format-error \
+            --cdn https://cdn.jsdelivr.net/gh/pygame-web/pygame-web.github.io@main/cdn/0.9.3/ \
             main.py
+
 
       - name: Prepare artifact
         run: |
