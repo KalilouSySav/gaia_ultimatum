@@ -100,9 +100,12 @@ jobs:
             fetch "$f"
           done
 
-          # Strip the absolute CDN URL from index.html so config.cdn becomes
-          # empty and every subsequent import resolves relative to this page.
-          sed -i 's|https://pygame-web.github.io/cdn/0.9.3/||g' index.html
+          # Rewrite the absolute pygame-web CDN URL to the repo-scoped
+          # GitHub Pages path. pythons.js resolves imports against
+          # `location.origin`, so config.cdn needs to include the subdirectory
+          # (`/gaia_ultimatum/`) or the browser fetches from the origin root
+          # and 404s.
+          sed -i "s|https://pygame-web.github.io/cdn/0.9.3/|/${GITHUB_REPOSITORY##*/}/|g" index.html
 
           echo "--- build/web layout ---"
           ls -la
