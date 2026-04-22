@@ -41,7 +41,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install "pygbag>=0.9"
 
-            - name: Build the WebAssembly bundle
+      - name: Build the WebAssembly bundle
         # --cdn jsDelivr : pygame-web.github.io triggers Firefox OpaqueResponseBlocking
         #                  because it serves JS/WASM without proper CORS/Content-Type
         #                  headers; jsDelivr proxies the same repo with correct headers.
@@ -53,7 +53,6 @@ jobs:
             --disable-sound-format-error \
             --cdn https://cdn.jsdelivr.net/gh/pygame-web/pygame-web.github.io@main/cdn/0.9.3/ \
             main.py
-
 
       - name: Prepare artifact
         run: |
