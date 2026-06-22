@@ -69,24 +69,20 @@ def _web_argv() -> list[str]:
 
     - Use the smaller 1 MB GeoJSON (``zones.geo.json``) instead of the full
       24 MB version, to keep the initial download reasonable.
-    - Disable audio by default: pygame's mixer may not be available in all
-      browsers, and the player can still unmute via config. ``--no-audio``
-      is LOAD-BEARING on WASM — without it, ``audio.AudioManager``
-      instantiates and calls ``pygame.mixer.pre_init`` + ``init`` at boot.
-      Pygame-web's mixer is unreliable across browsers (autoplay policy
-      blocks until first user gesture) and an init failure here would
-      crash the whole game before the title screen renders. Even if
-      mixer init succeeded, ``pygame.mixer.music.set_endevent`` posts a
-      USEREVENT integer that desktop pygame_ce and WASM pygame number
-      differently (see ``audio.MUSIC_END_EVENT``'s getattr fallback) —
-      cross-target audio is not worth the risk for the web demo.
+    - Audio enabled — pygame-ce 2.5.7's WASM mixer works under SDL2 ≥ 2.28.
+      The browser's autoplay policy means the AudioContext stays suspended
+      until the player's first click/keypress, but pygame queues calls
+      silently in the meantime so nothing crashes. ``audio.AudioManager``
+      already wraps ``mixer.pre_init`` + ``init`` in try/except and
+      ``audio.MUSIC_END_EVENT`` falls back to ``getattr(pygame,
+      "USEREVENT", 24) + 1`` so the per-target USEREVENT integer
+      mismatch is handled.
     - Seed the RNG so refreshes produce reproducible games (remove the seed
       if you prefer random runs).
     """
     return [
         "--map",
         str(ZONES_GEOJSON_LIGHT),
-        "--no-audio",
         "--seed",
         "42",
     ]

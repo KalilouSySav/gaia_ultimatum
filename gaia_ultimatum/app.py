@@ -173,6 +173,7 @@ async def _run_game(config: Config, args: argparse.Namespace) -> int:
         or "ANDROID_ARGUMENT" in _os.environ
         or hasattr(sys, "getandroidapilevel")
     )
+    is_web = sys.platform == "emscripten"
     if config.display.fullscreen or is_android:
         flags |= pygame.FULLSCREEN
     if getattr(config.display, "resizable", False) and not config.display.fullscreen:
@@ -206,6 +207,31 @@ async def _run_game(config: Config, args: argparse.Namespace) -> int:
                     "Android device %d×%d (aspect %.2f) → design canvas %d×%d",
                     dev_w, dev_h, device_aspect, design_w, design_h,
                 )
+    elif is_web:
+        # Pygbag passes the browser canvas size via ``data-CANVAS_WIDTH``
+        # / ``data-CANVAS_HEIGHT`` on the script tag (default 1280×720,
+        # 16:9). The 960×640 default canvas (3:2) would letterbox with
+        # side bars in that frame. Match the pygbag-reported size so the
+        # game fills the canvas the same way the Android wider-canvas
+        # branch does on a phone in landscape.
+        web_w, web_h = 1280, 720
+        try:
+            desktops = pygame.display.get_desktop_sizes()
+        except (pygame.error, AttributeError):
+            desktops = []
+        if desktops:
+            d_w, d_h = desktops[0]
+            if d_w > 0 and d_h > 0:
+                web_w, web_h = d_w, d_h
+        # Keep the existing height of 640 to preserve vertical layout
+        # measurements; just widen so map_rect fills the canvas.
+        design_h = config.display.height
+        design_w = max(config.display.width, round(design_h * (web_w / web_h)))
+        size = (design_w, design_h)
+        logger.info(
+            "Web canvas %d×%d (aspect %.2f) → design canvas %d×%d",
+            web_w, web_h, web_w / web_h, design_w, design_h,
+        )
     try:
         screen = pygame.display.set_mode(size, flags)
     except pygame.error as exc:
