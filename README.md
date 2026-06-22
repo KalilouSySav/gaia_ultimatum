@@ -1,11 +1,17 @@
-# Gaia Ultimatum
+# Terre Vivante
 
-A strategy game where humanity races to restore its balance with Earth while
-Gaia unleashes catastrophes across the globe. Click red points to harvest
-evolution energy, watch countries and their balance indicators react, and
-steer humankind to equilibrium before it is decimated.
+> *Comprendre la planète. S'émerveiller du vivant. Agir.*
 
-Built with [Pygame](https://www.pygame.org/).
+A strategy game where you play either **Gaïa** (unleashing one of five
+elemental catastrophes — Eau, Feu, Terre, Air, Vie) or **Humanité**
+(deploying the defences and ecological repair that science already
+knows). Each run is a short, replayable thought experiment in
+coexistence with a living planet.
+
+Built with [Pygame-CE](https://pygame-community.github.io/).
+The Python package is still named ``gaia_ultimatum`` for backwards
+compatibility with prior builds; the player-facing name is
+**Terre Vivante**.
 
 ## Requirements
 
@@ -161,6 +167,108 @@ anywhere (GitHub Pages, Netlify, Cloudflare Pages, S3, nginx, etc.).
   browsers that block autoplay.
 - The RNG is seeded (`--seed 42`) so refreshes produce the same game. Edit
   `main.py` to change or remove the seed.
+
+## Android build (Play Store APK)
+
+Built via [buildozer](https://buildozer.readthedocs.io/) +
+[python-for-android](https://python-for-android.readthedocs.io/) on a
+Linux host. On Windows, that means **WSL Ubuntu**. The build can't run
+on `/mnt/c` reliably (OneDrive holds file handles + spaces in the path
+break shell-outs inside p4a recipes); the build script stages the
+project to a Linux-clean path (`~/builds/gaia_ultimatum`) automatically.
+
+### Prerequisites
+
+1. WSL Ubuntu installed. From PowerShell as Administrator:
+
+   ```powershell
+   wsl --install -d Ubuntu
+   ```
+
+2. Inside WSL:
+
+   ```bash
+   cd '/mnt/c/Users/<you>/OneDrive/Desktop/projet logciel/gaia_ultimatum'
+   make android-setup        # one-time, ~5 min
+   ```
+
+   This installs system packages (build tools, SDL2-dev, ffmpeg, Java 17),
+   Python 3.11 (python-for-android's stable target — **not** 3.14, which
+   p4a doesn't yet support), and creates a buildozer venv at
+   `~/buildozer-venv`.
+
+3. Activate the venv (every new WSL session):
+
+   ```bash
+   source ~/buildozer-venv/bin/activate
+   ```
+
+### Build the APK
+
+```bash
+make android-debug
+```
+
+What it does:
+
+1. Rsyncs the project to `~/builds/gaia_ultimatum` (off OneDrive, off
+   the Windows mount — 20× faster IO).
+2. Runs `tools/transcode_to_ogg.py` to compress the 394 MB of WAV
+   audio down to ~40 MB of OGG (Play Store base APK cap is 150 MB).
+3. Runs `buildozer android debug` — **first build downloads the
+   Android SDK + NDK (~5 GB, ~30 min)**. Subsequent builds: 1–3 min.
+4. Drops the APK at
+   `~/builds/gaia_ultimatum/bin/gaiaultimatum-1.0.0-arm64-v8a-debug.apk`.
+
+### Sideload to your phone
+
+1. Enable USB Debugging on the phone (Settings → About → tap *Build
+   number* 7 times → Developer options → USB Debugging).
+2. Plug in via USB. Confirm the RSA fingerprint prompt.
+3. From inside WSL:
+
+   ```bash
+   adb install -r ~/builds/gaia_ultimatum/bin/*.apk
+   ```
+
+   (If `adb` isn't installed: `sudo apt install adb`.)
+
+### Expected failures + how to react
+
+The Android toolchain is finicky. Failures during first build are
+normal — the build script's output points at the line.
+
+| Symptom | Cause | Fix |
+| --- | --- | --- |
+| `ERROR: Aidl not found` during SDK setup | License not accepted | `~/.buildozer/android/platform/android-sdk/cmdline-tools/latest/bin/sdkmanager --licenses` then accept all |
+| `Cython.Build` import error in `pygame_ce` recipe build | Cython 3.x pinned | `wsl_setup.sh` pins 0.29.36; re-run `make android-setup` |
+| `Unsupported class file major version 65` | Java version mismatch | `sudo apt install openjdk-17-jdk`; export `JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64` |
+| `ModuleNotFoundError: No module named 'gaia_ultimatum'` at runtime | Asset paths missing | Check `buildozer.spec` `source.include_exts` matches your file extensions |
+| App crashes on launch with "couldn't start mixer" | Audio init order | Pass `--no-audio` via `app.py` Android branch as a temporary workaround while debugging |
+
+When in doubt: `logcat` from a connected phone shows the real error:
+
+```bash
+adb logcat | grep -E 'python|gaia|AndroidRuntime'
+```
+
+### Play Store submission checklist
+
+Code-side is done. Process-side:
+
+| Item | Owner | Lead time |
+| --- | --- | --- |
+| Google Play Developer account ($25 one-time) | you | 1–2 days ID verification |
+| Privacy policy URL (required even for offline games) | you | 30 min — host on GitHub Pages |
+| Data Safety questionnaire | you | 15 min |
+| Content rating (IARC questionnaire) | you | 10 min |
+| 512×512 app icon + 1024×500 feature graphic + ≥2 screenshots | you | 1–2 hr |
+| Short description (≤80 chars), long description (≤4000 chars) | you | 30 min |
+| Internal test track → ≥14 days with ≥12 testers | you | calendar critical path |
+
+The 14-day test-track requirement is the actual gating step for new
+developer accounts. Start the Play Console signup in parallel with
+the first APK build.
 
 ## Development
 

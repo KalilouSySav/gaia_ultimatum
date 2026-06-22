@@ -13,6 +13,10 @@ def test_parse_args_defaults() -> None:
     assert args.seed is None
     assert args.debug is False
     assert args.no_audio is False
+    # ``None`` (not ``False``) because the run path needs to distinguish
+    # "user said nothing — defer to config/env/touch-mode chain" from
+    # "user explicitly passed --no-fullscreen — force windowed".
+    assert args.fullscreen is None
 
 
 def test_parse_args_flags() -> None:
@@ -20,6 +24,18 @@ def test_parse_args_flags() -> None:
     assert args.seed == 7
     assert args.debug is True
     assert args.no_audio is True
+
+
+def test_parse_args_fullscreen_explicit_true() -> None:
+    args = parse_args(["--fullscreen"])
+    assert args.fullscreen is True
+
+
+def test_parse_args_fullscreen_explicit_false() -> None:
+    """``--no-fullscreen`` lets a Steam Deck or Android dev override the
+    auto-fullscreen default and run windowed for debugging."""
+    args = parse_args(["--no-fullscreen"])
+    assert args.fullscreen is False
 
 
 def test_version_exits(capsys: pytest.CaptureFixture[str]) -> None:

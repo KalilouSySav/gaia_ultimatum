@@ -23,7 +23,8 @@ classifiers = [
     "Topic :: Games/Entertainment :: Simulation",
 ]
 dependencies = [
-    "pygame>=2.5,<3",
+    "pygame-ce>=2.5,<3",
+    "Pillow>=10",
 ]
 
 [project.optional-dependencies]
@@ -35,6 +36,9 @@ dev = [
 ]
 web = [
     "pygbag>=0.9",
+]
+cinematics = [
+    "opencv-python>=4.5",
 ]
 
 [project.scripts]
@@ -57,6 +61,8 @@ gaia_ultimatum = [
     "data/images/*",
     "data/fonts/*",
     "sounds/*",
+    "sounds/playlists/*",
+    "sounds/playlists/**/*",
     "cinematics/*",
 ]
 

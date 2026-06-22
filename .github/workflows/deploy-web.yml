@@ -59,58 +59,88 @@ jobs:
         # blank. Mirror the runtime next to the game so everything loads from
         # the same origin.
         #
-        # pythons.js uses relative ES-module imports for the feature modules
-        # (vtx/snd/gui/fs), so the files have to sit at the *same directory*
-        # as index.html — not in a cdn/ subfolder. The cpython bundle lives
-        # under cpython312/ because that's how config.executable resolves it.
+        # The pygame-web CDN reorganised: ``pythons.js`` + ``cpython312/*`` +
+        # ``empty.html`` still live at ``/cdn/0.9.3/`` (version-pinned),
+        # while ``vtx.js`` / ``vt.js`` (the dynamic ES-module imports
+        # pythons.js does via ``await import("../vt[x].js")``) moved to
+        # ``/cdn/`` (unversioned). Mirror each from the correct path.
+        #
+        # The other files the previous version tried to mirror (snd.js /
+        # gui.js / fs.js / browserfs / xterm.*) aren't separate modules —
+        # those features live as functions *inside* pythons.js and the
+        # ``data-os="vtx,snd,gui"`` attribute just toggles their code
+        # paths. 404s on those filenames have always been harmless; we
+        # drop them to make the manifest match reality.
+        #
+        # Patch pythons.js so ``../vt[x].js`` resolves inside the deploy
+        # subdirectory. pythons.js sits at ``/<repo>/pythons.js``; its
+        # literal ``../`` would resolve to origin root, which we can't
+        # write to on a project Pages site. Rewriting to ``./`` lands
+        # the imports next to pythons.js where we DO control the path.
         run: |
           set -euo pipefail
           cd build/web
-          CDN_BASE="https://pygame-web.github.io/cdn/0.9.3"
+          REPO_NAME="${GITHUB_REPOSITORY##*/}"
 
-          fetch() {
-            local rel="$1"
-            mkdir -p "$(dirname "$rel")"
-            if curl -fsSL "$CDN_BASE/$rel" -o "$rel"; then
-              echo "  ok   $rel"
-            else
-              echo "  SKIP $rel"
+          fetch_required() {
+            local url="$1" dest="$2"
+            mkdir -p "$(dirname "$dest")"
+            if ! curl -fsSL "$url" -o "$dest"; then
+              echo "FATAL: required runtime file missing from CDN: $url" >&2
+              exit 1
             fi
+            echo "  ok   $dest  ($url)"
           }
 
-          # Runtime loaded directly by index.html + feature modules imported
-          # relatively by pythons.js (see data-os="vtx,fs,gui,snd" in template).
+          CDN_VERSIONED="https://pygame-web.github.io/cdn/0.9.3"
+          CDN_LATEST="https://pygame-web.github.io/cdn"
+
+          # Files that pythons.js loads via ``config.cdn`` (versioned path).
           for f in \
             pythons.js \
-            browserfs.min.js \
-            vtx.js snd.js gui.js fs.js \
-            xterm.js xterm.css \
-            xterm-addon-image.js xterm-addon-fit.js xterm-addon-image.wasm \
-            empty.html offline.png; do
-            fetch "$f"
-          done
-
-          # CPython 3.12 WebAssembly bundle
-          for f in \
+            empty.html \
             cpython312/main.js \
             cpython312/main.data \
-            cpython312/main.wasm \
-            cpython312/main.symbols \
-            cpython312/bundle.json; do
-            fetch "$f"
+            cpython312/main.wasm; do
+            fetch_required "$CDN_VERSIONED/$f" "$f"
           done
 
-          # Rewrite the absolute pygame-web CDN URL to the repo-scoped
-          # GitHub Pages path. pythons.js resolves imports against
-          # `location.origin`, so config.cdn needs to include the subdirectory
-          # (`/gaia_ultimatum/`) or the browser fetches from the origin root
-          # and 404s.
-          sed -i "s|https://pygame-web.github.io/cdn/0.9.3/|/${GITHUB_REPOSITORY##*/}/|g" index.html
+          # Files pythons.js dynamic-imports via ``../vt[x].js`` —
+          # unversioned on the CDN, must land at the SAME directory as
+          # pythons.js after the import-path patch below.
+          for f in vtx.js vt.js; do
+            fetch_required "$CDN_LATEST/$f" "$f"
+          done
+
+          # Patch pythons.js: ``await import("../vt.js")`` →
+          # ``await import("./vt.js")`` (same for vtx.js). Without this,
+          # the browser resolves ``../`` against pythons.js's URL
+          # (``/<repo>/pythons.js``), yielding origin-root paths that
+          # 404 on project Pages sites.
+          sed -i 's|await import("\.\./vt\.js")|await import("./vt.js")|g'   pythons.js
+          sed -i 's|await import("\.\./vtx\.js")|await import("./vtx.js")|g' pythons.js
+          if grep -q '"\.\./vt' pythons.js; then
+            echo "FATAL: pythons.js still contains ../ imports after patch" >&2
+            grep -n '"\.\./vt' pythons.js >&2
+            exit 1
+          fi
+
+          # config.cdn points pythons.js at the repo-scoped subdirectory
+          # for non-relative loads (cpython312/*, lib/index.html, …).
+          sed -i "s|https://pygame-web.github.io/cdn/0.9.3/|/$REPO_NAME/|g" index.html
 
           echo "--- build/web layout ---"
           ls -la
           echo "--- cpython312 ---"
           ls -la cpython312 2>/dev/null || true
+
+      - name: Publish privacy policy alongside the web build
+        # The Play Store listing needs a public URL for the privacy policy.
+        # Hosting it next to the web build keeps a single Pages deploy.
+        # Final URL: https://<user>.github.io/<repo>/privacy.html
+        run: |
+          cp docs/privacy.html build/web/privacy.html
+          test -f build/web/privacy.html
 
       - name: Prepare artifact
         run: |

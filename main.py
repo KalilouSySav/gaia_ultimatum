@@ -1,20 +1,51 @@
-"""Pygbag web entry point.
+"""Pygbag + buildozer entry point.
 
-Pygbag looks for ``main.py`` at the project root and bundles everything in
-that directory (including the ``gaia_ultimatum`` package and its assets) into
-a WebAssembly payload served as a static site.
+Pygbag (mobile-web build) AND python-for-android (native APK build)
+both look for ``main.py`` at the project root and treat it as the
+program entry. This file dispatches at boot to the correct argv set
+based on which one is running.
 
-The loop is driven by ``asyncio.run`` so it cooperates with the browser's
-event loop. See ``gaia_ultimatum.app.run_async`` for the actual game loop.
+  * pygbag / emscripten → ``_web_argv`` + asyncio-driven loop
+    (cooperates with the browser event loop).
+  * Android / p4a       → ``_android_argv`` + normal sync ``run``
+    (audio works, no autoplay constraint, light geojson keeps APK
+    install fast and battery use sane).
+  * Desktop (rare — most desktop runs use ``python -m gaia_ultimatum``)
+    → forward sys.argv unchanged.
 """
 
 from __future__ import annotations
 
 import asyncio
+import os
 import sys
 
-from gaia_ultimatum.app import run_async
 from gaia_ultimatum.assets import ZONES_GEOJSON_LIGHT
+
+
+def _is_android() -> bool:
+    """Robust Android detection across p4a variants.
+
+    ``sys.platform`` is reported as ``"android"`` on some p4a/SDL2
+    bootstraps but as ``"linux"`` on others (the SDL2 bootstrap inherits
+    the underlying Linux kernel signature unless p4a's runtime
+    explicitly overrides it). The ``ANDROID_ARGUMENT`` env var is set
+    by every p4a bootstrap regardless of bootstrap type. ``getandroidapilevel``
+    is exposed on the standard library starting in Python 3.7's Android
+    cross-build. Any one of the three being truthy means we're on
+    Android — and we want all three checks because relying on
+    ``sys.platform`` alone would silently fall through to the desktop
+    branch and load the 24 MB ``zones.geojson`` (excluded from the APK
+    by ``buildozer.spec``), crashing the app with FileNotFoundError on
+    boot.
+    """
+    if sys.platform == "android":
+        return True
+    if "ANDROID_ARGUMENT" in os.environ:
+        return True
+    if hasattr(sys, "getandroidapilevel"):
+        return True
+    return False
 
 
 def _web_argv() -> list[str]:
@@ -36,5 +67,32 @@ def _web_argv() -> list[str]:
     ]
 
 
-asyncio.run(run_async(_web_argv()))
-sys.exit(0)
+def _android_argv() -> list[str]:
+    """Default CLI arguments tuned for the native Android build.
+
+    - Light GeoJSON — same reason as web: the full 24 MB is excluded
+      from the APK by ``buildozer.spec``'s ``source.exclude_patterns``,
+      so loading the heavy variant would fail with FileNotFoundError
+      regardless. Keep main.py and buildozer.spec in lockstep.
+    - Audio enabled — Android has a working mixer and no browser
+      autoplay constraint. The audio dispatcher waits for the
+      AudioManager init in ``app.py`` to gate first play_playlist.
+    - No fixed seed — a tap-launch on a phone wants a fresh run, not
+      a replay of seed 42 every time.
+    """
+    return [
+        "--map",
+        str(ZONES_GEOJSON_LIGHT),
+    ]
+
+
+if sys.platform == "emscripten":
+    from gaia_ultimatum.app import run_async
+    asyncio.run(run_async(_web_argv()))
+    sys.exit(0)
+elif _is_android():
+    from gaia_ultimatum.app import run
+    sys.exit(run(_android_argv()))
+else:
+    from gaia_ultimatum.app import run
+    sys.exit(run(sys.argv[1:]))

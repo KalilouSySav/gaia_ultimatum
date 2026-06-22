@@ -1,1 +1,5 @@
-pygame>=2.5,<3
+pygame-ce>=2.5,<3
+Pillow>=10
+# Optional: enables MP4 intro/outro cinematics. The game falls back to its
+# procedural cinematic envelope when this is missing (e.g. browser/pygbag).
+opencv-python>=4.5
