@@ -12,6 +12,17 @@ based on which one is running.
     install fast and battery use sane).
   * Desktop (rare — most desktop runs use ``python -m gaia_ultimatum``)
     → forward sys.argv unchanged.
+
+Structure: ONE top-level ``asyncio.run(main())`` so pygbag's
+``check_code`` detects the async entry point AND its run() helper
+recognises the canonical ``main`` coroutine name (special-cased in
+``pygbag/support/cross/aio/__init__.py:378``). The earlier version
+branched into ``asyncio.run(run_async(...))`` inside an ``if`` block —
+the coro name was "run_async", which pygbag scheduled but tore down
+mid-startup, crashing with ``AttributeError: module 'pygame' has no
+attribute 'init'``. Wrapping the per-platform branches inside ``main``
+keeps pygbag happy on web and stays equivalent on Android / desktop
+(where ``asyncio.run`` is the standard blocking implementation).
 """
 
 from __future__ import annotations
@@ -95,20 +106,26 @@ def _android_argv() -> list[str]:
     ]
 
 
-if sys.platform == "emscripten":
-    # Pygbag patches ``asyncio.run`` to schedule the coroutine on the
-    # browser event loop and return IMMEDIATELY — the browser owns the
-    # main thread, not Python. A trailing ``sys.exit(0)`` here would
-    # therefore fire BEFORE ``run_async`` actually runs, tearing down
-    # the pygame module mid-startup; the queued task would then crash
-    # with ``AttributeError: module 'pygame' has no attribute 'init'``.
-    # Let control fall through end-of-file — the browser keeps the
-    # event loop alive on its own.
+async def main() -> int:
+    """Single async entry point dispatched per platform.
+
+    The coroutine MUST be named ``main`` — pygbag's
+    ``aio/__init__.py:run`` special-cases this name to wrap the call
+    in ``aio.fetch.preload`` and keep the browser event loop alive
+    until the coroutine returns.
+    """
     from gaia_ultimatum.app import run_async
-    asyncio.run(run_async(_web_argv()))
-elif _is_android():
-    from gaia_ultimatum.app import run
-    sys.exit(run(_android_argv()))
-else:
-    from gaia_ultimatum.app import run
-    sys.exit(run(sys.argv[1:]))
+
+    if sys.platform == "emscripten":
+        return await run_async(_web_argv())
+    if _is_android():
+        return await run_async(_android_argv())
+    return await run_async(sys.argv[1:])
+
+
+# One top-level ``asyncio.run(main())`` — the pattern pygbag's
+# ``check_code`` (``cpythonrc.py:778``) scans for. On desktop this is
+# the standard blocking implementation; on emscripten pygbag's patched
+# version schedules the coroutine on the browser event loop and the
+# loop drives it from there.
+asyncio.run(main())
