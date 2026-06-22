@@ -894,6 +894,22 @@ class AudioManager:
         # "music stuck on title forever". No-op on desktop / Android.
         if sys.platform == "emscripten":
             crossfade_ms = 0
+            # Pygame-web's MediaManager allocates a new HTMLAudioElement
+            # per mixer.music.load() and tries to ``.play()`` it. Browser
+            # autoplay policy ties permission to the user gesture that
+            # was on the stack when the element was created — by the
+            # time we're calling play_playlist from the per-frame phase
+            # check, the original PLAY-button gesture isn't on the
+            # stack anymore and the new element's .play() gets rejected
+            # ("Rejection occurred: The play method is not allowed..."
+            # in Firefox). Explicitly stopping the current music first
+            # tells the MediaManager to drop the old element so the
+            # subsequent load() can reuse the gesture-permitted slot
+            # instead of creating a fresh one that the browser blocks.
+            try:
+                pygame.mixer.music.stop()
+            except pygame.error:
+                pass
         is_real_switch = (
             effective_outgoing is not None
             and self._current_playlist is not None
