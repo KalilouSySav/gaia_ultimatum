@@ -125,6 +125,23 @@ jobs:
             exit 1
           fi
 
+          # Drop the ``vtx`` feature from ``data-os``. ``vtx`` toggles
+          # the in-browser xterm terminal for Python stdout — useful for
+          # CLI tools, useless for a graphical game (the player never
+          # sees a terminal). Keeping it on would pull in
+          # ``vt/xterm.js`` + ``vt/xterm.css`` + ``vt/xterm-addon-image.{js,wasm}``,
+          # all of which would 404 on Pages (vtx.js builds the path
+          # as ``config.cdn + "../vt/"`` which resolves to origin
+          # root). Dropping vtx removes the whole xterm dependency
+          # chain. ``snd,gui`` is enough for a pygame game.
+          sed -i 's|data-os="vtx,snd,gui"|data-os="snd,gui"|g' index.html
+          sed -i 's|data-os="vtx,fs,gui,snd"|data-os="fs,gui,snd"|g' index.html
+          if grep -q 'data-os="[^"]*vtx' index.html; then
+            echo "FATAL: index.html still requests vtx feature after patch" >&2
+            grep -n 'data-os' index.html >&2
+            exit 1
+          fi
+
           # config.cdn points pythons.js at the repo-scoped subdirectory
           # for non-relative loads (cpython312/*, lib/index.html, …).
           sed -i "s|https://pygame-web.github.io/cdn/0.9.3/|/$REPO_NAME/|g" index.html
