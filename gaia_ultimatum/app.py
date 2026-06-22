@@ -75,7 +75,16 @@ def run(argv: list[str] | None = None) -> int:
 
 
 async def run_async(argv: list[str] | None = None) -> int:
-    """Async entry point used by both desktop (``asyncio.run``) and pygbag."""
+    """Async entry point used by both desktop (``asyncio.run``) and pygbag.
+
+    Yields to the event loop ONCE before touching pygame. Pygbag wires
+    the real pygame module asynchronously after the coroutine first
+    yields — calling ``pygame.init()`` before any ``await`` raises
+    ``AttributeError: module 'pygame' has no attribute 'init'`` on the
+    WASM build (desktop and Android are eager and unaffected). The
+    sleep is a no-op on every other target.
+    """
+    await asyncio.sleep(0)
     args = parse_args(argv)
     config = load_config()
     if args.debug:
