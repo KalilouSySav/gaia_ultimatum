@@ -59,7 +59,16 @@ logger = logging.getLogger(__name__)
 # app loop forwards events to AudioManager.handle_event which advances the
 # playlist — gives gapless track changes without polling get_busy each
 # frame.
-MUSIC_END_EVENT = pygame.USEREVENT + 1
+#
+# ``pygame.USEREVENT`` is normally a top-level constant (= 24) but the
+# pygame-web emscripten build doesn't expose it at module-import time —
+# ``import pygame`` succeeds but ``pygame.USEREVENT`` raises
+# ``AttributeError`` until ``pygame.init()`` runs. ``getattr`` with the
+# canonical SDL value as fallback keeps the constant resolvable at
+# module load on every target. The numeric value is fixed in SDL2
+# (``SDL_USEREVENT = 0x8000`` mapped to 24 by pygame), so the fallback
+# matches what pygame would otherwise return.
+MUSIC_END_EVENT = getattr(pygame, "USEREVENT", 24) + 1
 # Subdir under SOUNDS_DIR where each subfolder is a playlist category. The
 # user can drop new .mp3 files in `sounds/playlists/playing/` etc. to grow
 # the in-game soundtrack without touching code.
