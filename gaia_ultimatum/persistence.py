@@ -126,7 +126,16 @@ def _save_dir() -> Path:
     if os.name == "nt":
         base = os.environ.get("APPDATA") or str(Path.home())
         return Path(base) / "GaiaUltimatum"
-    return Path.home() / ".config" / "gaia_ultimatum"
+    # ``Path.home()`` can raise ``RuntimeError`` on emscripten when
+    # ``$HOME`` is unset (pygbag doesn't always export it). Falling
+    # back to ``/tmp`` keeps the per-tab MEMFS sandbox usable —
+    # state still wipes on reload (already documented in the
+    # docstring above), but at least the prefs file can be written
+    # within the session.
+    try:
+        return Path.home() / ".config" / "gaia_ultimatum"
+    except RuntimeError:
+        return Path("/tmp/gaia_ultimatum")
 
 
 def _ensure_dir() -> Path:

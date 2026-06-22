@@ -345,6 +345,15 @@ class CinematicLibrary:
                 # bookkeeping stays in one place.
                 self.get(name)
 
+        # Skip the preload thread entirely when cv2 isn't available
+        # (browser/WASM, p4a without opencv recipe). ``get()`` would
+        # short-circuit to ``None`` on every clip anyway — the thread
+        # would just iterate, find nothing to open, and exit — but on
+        # pygame-web ``threading.Thread.start()`` is shimmed to a no-op
+        # that can still log a pygbag warning. Better to skip outright.
+        if not _CV2_AVAILABLE:
+            t = threading.Thread(target=lambda: None, daemon=True, name="cinematic-preload-noop")
+            return t  # not started — caller's contract is just "got a handle"
         t = threading.Thread(target=_preload, daemon=True, name="cinematic-preload")
         t.start()
         return t

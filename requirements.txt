@@ -2,4 +2,11 @@ pygame-ce>=2.5,<3
 Pillow>=10
 # Optional: enables MP4 intro/outro cinematics. The game falls back to its
 # procedural cinematic envelope when this is missing (e.g. browser/pygbag).
-opencv-python>=4.5
+#
+# Marker: opencv-python has no WebAssembly wheel — pygbag's resolver
+# would try to fetch one, fail, and either crash the build or silently
+# ship a broken bundle. Same story on python-for-android (no recipe,
+# 70 MB of native deps the APK doesn't need). ``cinematics_player.py``
+# already catches the ``ImportError`` and falls back to the procedural
+# envelope, so the desktop-only restriction is purely a packaging cue.
+opencv-python>=4.5; platform_system != "Emscripten" and platform_machine != "wasm32" and sys_platform != "android"
