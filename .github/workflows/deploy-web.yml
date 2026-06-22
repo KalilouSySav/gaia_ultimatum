@@ -125,6 +125,25 @@ jobs:
             exit 1
           fi
 
+          # Prepend ``<!DOCTYPE html>``. pygbag's template ships an
+          # index that opens with ``<html lang="en-us">`` directly —
+          # browsers fall back to Quirks Mode without a doctype, which
+          # changes box-model + flex-layout calculations. The console
+          # warning ("This page is in Quirks Mode…") is harmless on its
+          # own but breaks layout reproducibility between browsers.
+          if ! head -c 50 index.html | grep -qi "<!doctype"; then
+            sed -i '1i<!DOCTYPE html>' index.html
+          fi
+
+          # Drop the dead ``<script src=".../browserfs.min.js">`` tag.
+          # pygbag's template references browserfs for in-browser
+          # filesystem persistence, but pygame-web removed the upstream
+          # dependency a few versions back (pythons.js line 1251:
+          # "was browserfs, removed must be fully provided from
+          # template"). The script tag now just 404s on every load
+          # and clutters the console. Strip it so the load is clean.
+          sed -i '/browserfs\.min\.js/d' index.html
+
           # Drop the ``vtx`` feature from ``data-os``. ``vtx`` toggles
           # the in-browser xterm terminal for Python stdout — useful for
           # CLI tools, useless for a graphical game (the player never
