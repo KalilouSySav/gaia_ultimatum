@@ -96,9 +96,16 @@ def _android_argv() -> list[str]:
 
 
 if sys.platform == "emscripten":
+    # Pygbag patches ``asyncio.run`` to schedule the coroutine on the
+    # browser event loop and return IMMEDIATELY — the browser owns the
+    # main thread, not Python. A trailing ``sys.exit(0)`` here would
+    # therefore fire BEFORE ``run_async`` actually runs, tearing down
+    # the pygame module mid-startup; the queued task would then crash
+    # with ``AttributeError: module 'pygame' has no attribute 'init'``.
+    # Let control fall through end-of-file — the browser keeps the
+    # event loop alive on its own.
     from gaia_ultimatum.app import run_async
     asyncio.run(run_async(_web_argv()))
-    sys.exit(0)
 elif _is_android():
     from gaia_ultimatum.app import run
     sys.exit(run(_android_argv()))
