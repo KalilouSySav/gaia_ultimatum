@@ -882,21 +882,23 @@ class AudioManager:
             )
         else:
             effective_outgoing = outgoing
-        # The cross-playlist switch path below uses ``mixer.music.fadeout()``
-        # then defers loading the new track until ``MUSIC_END_EVENT`` fires.
-        # Pygame-web's WASM mixer accepts ``fadeout()`` but never posts the
-        # endevent — the outgoing track fades to silence and no new music
-        # ever starts. Force the WASM build down the immediate-play branch
-        # so the swap happens synchronously (with a short fade-in on the
-        # incoming track only; the outgoing stops abruptly, which is the
-        # right trade for "the music actually changes when the phase
-        # does"). No-op on desktop / Android.
+        # Pygame-web's WASM mixer accepts ``fadeout()`` but never posts
+        # ``MUSIC_END_EVENT`` when the fade completes — the outgoing
+        # track fades to silence and no new music ever starts because
+        # ``advance_track`` waits for the event to fire ``_load_and_play``
+        # on the pending track. Force ``crossfade_ms = 0`` on emscripten
+        # so play_playlist takes the immediate-play branch
+        # (``_load_and_play(track, fade_in_ms=0)``) directly. The
+        # outgoing track stops abruptly instead of fading, but the
+        # trade is "music actually changes when the phase does" vs
+        # "music stuck on title forever". No-op on desktop / Android.
+        if sys.platform == "emscripten":
+            crossfade_ms = 0
         is_real_switch = (
             effective_outgoing is not None
             and self._current_playlist is not None
             and self._current_playlist != name
             and pygame.mixer.music.get_busy()
-            and sys.platform != "emscripten"
         )
         if start_index < 0:
             # Mood-weighted initial pick — first track of the new
