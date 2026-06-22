@@ -1,3 +1,8 @@
+# /// script
+# dependencies = [
+#   "pygame-ce",
+# ]
+# ///
 """Pygbag + buildozer entry point.
 
 Pygbag (mobile-web build) AND python-for-android (native APK build)
