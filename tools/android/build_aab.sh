@@ -166,7 +166,14 @@ export CXXFLAGS="-Wl,-z,max-page-size=16384 ${CXXFLAGS:-}"
 # verified above) and produces a signed AAB when called with the
 # ``release`` build type. The ``aab`` argument is what flips the
 # output format from APK to AAB.
-buildozer android release aab
+#
+# Pipe ``y\n`` so the "Buildozer is running as root!" interactive
+# prompt resolves automatically — under WSL/CI everything runs as
+# root and there's no realistic way to drop privileges mid-build
+# (the Android SDK lives under /root/.buildozer/). Without the
+# pipe the build hangs waiting on stdin and dies with EOFError when
+# called non-interactively (background job, CI worker, etc.).
+yes y | buildozer android release aab
 
 # Locate the produced AAB.
 AAB="$(ls -t bin/*-release.aab 2>/dev/null | head -1)"
