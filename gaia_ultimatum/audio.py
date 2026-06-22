@@ -16,14 +16,38 @@ if the mixer fails to initialise).
 from __future__ import annotations
 
 import functools
+import importlib
 import logging
 import math
 import random
-import wave
 from collections import deque
 from pathlib import Path
 
 import pygame
+
+
+# ``wave`` is stdlib on CPython but the pygame-web emscripten CPython 3.12
+# build strips it. A plain ``import wave`` at module top would trigger
+# pygbag's auto-installer before any of *our* exception handlers can run:
+# pygbag parses module-level imports, sees ``wave``, tries to
+# ``pip_install("wave")``, gets the PyPI stub ``wave-0.1.0`` (an empty
+# placeholder), the stub doesn't provide a ``wave`` module, and the
+# whole bundle crashes at startup with ``ModuleNotFoundError``.
+#
+# Hiding the import behind ``importlib.import_module`` makes the
+# dependency invisible to pygbag's static analyser — the import only
+# happens lazily inside ``_wav_duration_s``, which is the sole consumer
+# and already returns ``None`` on any failure. WAVs are excluded from
+# the Android and web bundles anyway (transcoded to OGG), so the
+# function rarely runs on either target.
+def _load_wave_module() -> object | None:
+    try:
+        return importlib.import_module("wave")
+    except ModuleNotFoundError:
+        return None
+
+
+_wave_mod = _load_wave_module()
 
 from gaia_ultimatum.assets import SOUNDS_DIR
 from gaia_ultimatum.config import AudioConfig
@@ -79,14 +103,16 @@ _PLAYLIST_MIN_PLAYTIME_S: dict[str, float] = {
 
 def _wav_duration_s(path: Path) -> float | None:
     """Return WAV duration in seconds, or None on any read failure."""
+    if _wave_mod is None:  # WASM build — see _load_wave_module above
+        return None
     try:
-        with wave.open(str(path), "rb") as w:
+        with _wave_mod.open(str(path), "rb") as w:
             frames = w.getnframes()
             rate = w.getframerate()
             if rate <= 0:
                 return None
             return frames / rate
-    except (wave.Error, OSError, EOFError) as exc:
+    except (_wave_mod.Error, OSError, EOFError) as exc:
         logger.warning("Could not measure WAV duration of %s: %s", path, exc)
         return None
 
