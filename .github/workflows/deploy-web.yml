@@ -96,8 +96,15 @@ jobs:
           CDN_LATEST="https://pygame-web.github.io/cdn"
 
           # Files that pythons.js loads via ``config.cdn`` (versioned path).
+          # ``cpythonrc.py`` is the bootstrap script CPython runs at
+          # startup — it defines ``import_site``, ``import_pkg`` and the
+          # PEP 723 dependency-installer that ``site.py`` calls into.
+          # Without it the very first frame after the WASM interpreter
+          # loads dies with ``NameError: name 'import_site' is not
+          # defined``.
           for f in \
             pythons.js \
+            cpythonrc.py \
             empty.html \
             cpython312/main.js \
             cpython312/main.data \
