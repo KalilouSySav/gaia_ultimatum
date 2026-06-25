@@ -78,6 +78,11 @@ rsync -a --delete \
     --exclude='.buildozer/' \
     --exclude='build/' \
     --exclude='dist/' \
+    --exclude='pyproject.toml' \
+    --exclude='requirements.txt' \
+    --exclude='requirements-dev.txt' \
+    --exclude='setup.py' \
+    --exclude='setup.cfg' \
     "${REPO_ROOT}/" "${BUILD_ROOT}/"
 
 cd "${BUILD_ROOT}"

@@ -103,6 +103,24 @@ if [ ! -f "${REPO_ROOT}/buildozer.spec" ]; then
 fi
 
 # Stage source to Linux-clean build root (same rationale as build_apk.sh).
+#
+# Exclude pyproject.toml / requirements.txt / setup.py / setup.cfg from
+# the stage. python-for-android sets ``use_setup_py: true`` in
+# ``dist_info.json`` whenever it sees any of those files and then runs
+# ``pip install .`` host-side during the bundling step. On our project
+# that resolves the ``pygame-ce>=2.5,<3`` dep in pyproject.toml and
+# installs pygame_ce with HOST wheels (linux_x86_64) into the
+# arm64-v8a site-packages, overwriting the correctly cross-built
+# upstream pygame and shipping x86_64 ``.so`` files inside an arm64
+# APK. The phone then crashes on launch trying to load
+# ``_render.cpython-314-x86_64-linux-gnu.so``.
+#
+# We don't need any of those files at runtime — buildozer.spec's
+# ``requirements = python3,pygame,pillow`` is the source of truth for
+# Android dependencies, and the recipes ship the cross-built native
+# code. Stripping them from the stage forces p4a's ``use_setup_py``
+# off; the bundle then contains only the arm64 native binaries that
+# the recipes produced.
 echo "==> Staging source to ${BUILD_ROOT}..."
 mkdir -p "${BUILD_ROOT}"
 rsync -a --delete \
@@ -114,6 +132,11 @@ rsync -a --delete \
     --exclude='.buildozer/' \
     --exclude='build/' \
     --exclude='dist/' \
+    --exclude='pyproject.toml' \
+    --exclude='requirements.txt' \
+    --exclude='requirements-dev.txt' \
+    --exclude='setup.py' \
+    --exclude='setup.cfg' \
     "${REPO_ROOT}/" "${BUILD_ROOT}/"
 
 cd "${BUILD_ROOT}"
