@@ -366,6 +366,7 @@ class Renderer:
             if not game.sidebar_collapsed:
                 self._draw_right_panel(surface, game)
             self._draw_sidebar_toggle(surface, game)
+            self._draw_recenter_button(surface, game)
             self._draw_news_ticker(surface, game)
         if game.info_panel_visible and game.info_panel_country:
             country = game.world.countries.get(game.info_panel_country)
@@ -10135,6 +10136,52 @@ class Renderer:
             False, pts, 3,
         )
 
+    def _draw_recenter_button(
+        self, surface: pygame.Surface, game: Game,
+    ) -> None:
+        """Discrete "fit to screen" pill at the bottom-left of the map.
+
+        Same low-contrast idiom as ``_draw_sidebar_toggle``:
+        soft surface fill + thin border, both lifted on hover with
+        the active catastrophe's tint. Icon is a square frame with a
+        centre dot — universally read as "recentre / fit view" and
+        small enough not to compete with map content. Tap resets
+        zoom + pan so the player can recover from a stuck deep-zoom
+        in one click instead of pinch-zooming back to overview.
+        """
+        rect = recenter_map_button_rect(self.config)
+        mouse_pos = pygame.mouse.get_pos()
+        hover = rect.collidepoint(mouse_pos)
+        cat_color = game.gaia.active.arc_color
+
+        fill = (
+            self.palette.surface_elevated[:3]
+            if hover else self.palette.surface[:3]
+        )
+        # Round-rect body, same radius family as the sidebar pill so
+        # the two map-edge controls feel like siblings.
+        pygame.draw.rect(surface, fill, rect, border_radius=6)
+        border_color = (
+            _blend(self.palette.ui_border, cat_color, 0.45)
+            if hover else self.palette.ui_border_soft
+        )
+        pygame.draw.rect(surface, border_color, rect, 1, border_radius=6)
+
+        # Icon — outer frame (corner brackets) + centre dot. Reads as
+        # "snap viewport back to centre" even without a label.
+        glyph_color = self.palette.text if hover else self.palette.text_label
+        cx, cy = rect.centerx, rect.centery
+        arm = max(4, rect.width // 5)
+        inset = max(3, rect.width // 6)
+        # Four corner brackets — small L-shapes pointing inward.
+        for dx, dy in ((-1, -1), (1, -1), (-1, 1), (1, 1)):
+            x = cx + dx * (rect.width // 2 - inset)
+            y = cy + dy * (rect.height // 2 - inset)
+            pygame.draw.line(surface, glyph_color, (x, y), (x - dx * arm, y), 2)
+            pygame.draw.line(surface, glyph_color, (x, y), (x, y - dy * arm), 2)
+        # Centre dot.
+        pygame.draw.circle(surface, glyph_color, (cx, cy), 2)
+
     def _draw_pause_vignette(
         self, surface: pygame.Surface, size: tuple[int, int],
     ) -> None:
@@ -13707,6 +13754,26 @@ def sidebar_toggle_rect(config: Config, collapsed: bool) -> pygame.Rect:
         x = w - RIGHT_PANEL_W - btn_w - 2
     y = TOP_BAR_H + (h - TOP_BAR_H - NEWS_BAR_H - btn_h) // 2
     return pygame.Rect(x, y, btn_w, btn_h)
+
+
+def recenter_map_button_rect(config: Config) -> pygame.Rect:
+    """Discrete "fit to screen" button at the bottom-left of the map.
+
+    Resets ``world.scale`` and ``world.offset_x/y`` to defaults so the
+    player can recover from a deep zoom or panned-off-edge view in
+    one tap instead of pinch-zooming back to fit. Lives just inside
+    the map's bottom-left corner so it sits in dead space the eye
+    rarely tracks during gameplay — visible enough to find when
+    needed, ignorable otherwise.
+
+    Touch-mode bumps the size 28 → 44 to clear the Material Design
+    minimum tap target. Both sizes square so the icon (centred
+    cross-hairs) renders symmetrically.
+    """
+    h = config.display.height
+    size = MIN_TOUCH_TARGET if config.display.touch_mode else 28
+    # Bottom-left of map area: 10px in from left, 10px above news ticker.
+    return pygame.Rect(10, h - NEWS_BAR_H - 10 - size, size, size)
 
 
 def minimap_rect(config: Config) -> pygame.Rect:

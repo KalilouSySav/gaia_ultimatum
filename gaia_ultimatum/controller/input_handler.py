@@ -546,12 +546,27 @@ class InputHandler:
 
             # Sidebar collapse / expand chevron — visible at all times during
             # PLAYING, regardless of current panel state.
-            from gaia_ultimatum.view.renderer import sidebar_toggle_rect
+            from gaia_ultimatum.view.renderer import (
+                recenter_map_button_rect,
+                sidebar_toggle_rect,
+            )
             if sidebar_toggle_rect(
                 self.config, game.sidebar_collapsed,
             ).collidepoint(mouse_pos):
                 game.push_event(GameEvent.BUTTON_CLICK)
                 game.sidebar_collapsed = not game.sidebar_collapsed
+                return
+
+            # Recenter map — bottom-left discrete button. Resets zoom +
+            # pan so the player can recover from a deep zoom or
+            # off-screen pan in one tap. ``view_center_y`` is set by
+            # the per-phase centring logic each frame, so we don't
+            # touch it here.
+            if recenter_map_button_rect(self.config).collidepoint(mouse_pos):
+                game.push_event(GameEvent.BUTTON_CLICK)
+                game.world.scale = 1.5
+                game.world.offset_x = 0.0
+                game.world.offset_y = 0.0
                 return
 
             for country_id, row_rect in game.leaderboard_rects:
